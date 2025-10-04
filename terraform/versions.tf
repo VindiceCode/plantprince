@@ -1,12 +1,3 @@
-terraform {
-  required_version = ">= 1.0"
-  
-  required_providers {
-    digitalocean = {
-      source  = "digitalocean/digitalocean"
-      version = "~> 2.34"
-    }
-  }
 
   # Optional: Configure remote state storage
   # Uncomment and configure for team collaboration
@@ -18,4 +9,3 @@ terraform {
   #   skip_credentials_validation = true
   #   skip_metadata_api_check     = true
   # }
-}

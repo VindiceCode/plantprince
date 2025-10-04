@@ -28,7 +28,6 @@ resource "digitalocean_spaces_bucket" "garden_planner_storage" {
     allowed_headers = ["*"]
     allowed_methods = ["GET", "PUT", "POST", "DELETE", "HEAD"]
     allowed_origins = var.allowed_origins
-    expose_headers  = ["ETag"]
     max_age_seconds = 3000
   }
 
