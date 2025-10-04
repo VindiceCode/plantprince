@@ -637,116 +637,76 @@
         </div>
     </div>
 
+    <!-- jQuery -->
+    <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
+
     <script>
-        // State management
-        const state = {
-            currentStep: 1,
-            formData: {
-                address: '',
-                direction: '',
-                water: '',
-                maintenance: '',
-                gardenType: '',
-                photo: null
-            },
-            recommendations: null,
-            selectedPlants: new Set(),
-            generatedImage: null
-        };
+        $(document).ready(function () {
+            // State object
+            const state = {
+                currentStep: 1,
+                formData: {
+                    address: '',
+                    direction: '',
+                    water: '',
+                    maintenance: '',
+                    gardenType: '',
+                    photo: null
+                },
+                recommendations: null,
+                selectedPlants: new Set()
+            };
 
-        // DOM elements
-        const elements = {
-            step1: document.getElementById('step-1'),
-            step2: document.getElementById('step-2'),
-            step3: document.getElementById('step-3'),
-            loadingOverlay: document.getElementById('loading-overlay'),
-            addressInput: document.getElementById('address'),
-            continueToPreferences: document.getElementById('continue-to-preferences'),
-            backToLocation: document.getElementById('back-to-location'),
-            getPlantPlan: document.getElementById('get-plant-plan'),
-            startOver: document.getElementById('start-over'),
-            printPlan: document.getElementById('print-plan'),
-            zoneDisplay: document.getElementById('zone-display'),
-            seasonDisplay: document.getElementById('season-display'),
-            selectionCount: document.getElementById('selection-count'),
-            plantsContainer: document.getElementById('plants-container'),
-            photoInput: document.getElementById('photo-input'),
-            fileUpload: document.getElementById('file-upload')
-        };
+            // Show specific step
+            function showStep(stepNumber) {
+                $('#step-1, #step-2, #step-3').addClass('hidden');
+                $(`#step-${stepNumber}`).removeClass('hidden').addClass('fade-in');
 
-        // Utility functions
-        function showStep(stepNumber) {
-            // Hide all steps
-            elements.step1.classList.add('hidden');
-            elements.step2.classList.add('hidden');
-            elements.step3.classList.add('hidden');
+                // Update progress indicators
+                for (let i = 1; i <= 3; i++) {
+                    const $indicator = $(`#step-indicator-${i}`);
+                    if (i <= stepNumber) {
+                        $indicator.removeClass('inactive').addClass('active');
+                    } else {
+                        $indicator.removeClass('active').addClass('inactive');
+                    }
+                }
 
-            // Show requested step
-            const stepElement = document.getElementById(`step-${stepNumber}`);
-            stepElement.classList.remove('hidden');
-            stepElement.classList.add('fade-in');
+                state.currentStep = stepNumber;
+            }
 
-            // Update progress indicators
-            for (let i = 1; i <= 3; i++) {
-                const indicator = document.getElementById(`step-indicator-${i}`);
-                if (i <= stepNumber) {
-                    indicator.classList.remove('inactive');
-                    indicator.classList.add('active');
-                } else {
-                    indicator.classList.remove('active');
-                    indicator.classList.add('inactive');
+            // Validate current step and enable/disable buttons
+            function validateStep() {
+                if (state.currentStep === 1) {
+                    const isValid = state.formData.address && state.formData.direction;
+                    $('#continue-to-preferences').prop('disabled', !isValid);
+                } else if (state.currentStep === 2) {
+                    const isValid = state.formData.water && state.formData.maintenance && state.formData.gardenType;
+                    $('#get-plant-plan').prop('disabled', !isValid);
                 }
             }
 
-            state.currentStep = stepNumber;
-        }
+            // Setup button groups for option selection
+            function setupButtonGroup(containerId, fieldName) {
+                $(`#${containerId} .option-button`).click(function () {
+                    // Remove selected from all buttons in this group
+                    $(`#${containerId} .option-button`).removeClass('selected');
 
-        function validateCurrentStep() {
-            if (state.currentStep === 1) {
-                const isValid = state.formData.address && state.formData.direction;
-                elements.continueToPreferences.disabled = !isValid;
-                return isValid;
-            } else if (state.currentStep === 2) {
-                const isValid = state.formData.water && state.formData.maintenance && state.formData.gardenType;
-                elements.getPlantPlan.disabled = !isValid;
-                return isValid;
-            }
-            return true;
-        }
+                    // Add selected to clicked button
+                    $(this).addClass('selected');
 
-        function setupButtonGroup(containerId, fieldName) {
-            const container = document.getElementById(containerId);
-            const buttons = container.querySelectorAll('.option-button');
+                    // Update state
+                    state.formData[fieldName] = $(this).data('value');
 
-            buttons.forEach(button => {
-                button.addEventListener('click', () => {
-                    // Remove selected class from all buttons in this group
-                    buttons.forEach(btn => btn.classList.remove('selected'));
-
-                    // Add selected class to clicked button
-                    button.classList.add('selected');
-
-                    // Update form data
-                    state.formData[fieldName] = button.dataset.value;
-
-                    // Validate current step
-                    validateCurrentStep();
+                    // Validate step
+                    validateStep();
                 });
-            });
-        }
+            }
 
-        function showLoading() {
-            elements.loadingOverlay.classList.remove('hidden');
-        }
+            // Submit form to get recommendations
+            function submitForm() {
+                $('#loading-overlay').removeClass('hidden');
 
-        function hideLoading() {
-            elements.loadingOverlay.classList.add('hidden');
-        }
-
-        async function submitForm() {
-            showLoading();
-
-            try {
                 const requestData = {
                     location: state.formData.address,
                     direction: state.formData.direction,
@@ -755,158 +715,125 @@
                     garden_type: state.formData.gardenType
                 };
 
-                const response = await fetch('/api/recommendations', {
+                $.ajax({
+                    url: '/api/recommendations',
                     method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
+                    contentType: 'application/json',
+                    data: JSON.stringify(requestData),
+                    success: function (data) {
+                        state.recommendations = data;
+                        // Initialize all plants as selected
+                        state.selectedPlants = new Set(data.plants.map(p => p.name));
+                        displayResults();
+                        showStep(3);
                     },
-                    body: JSON.stringify(requestData)
+                    error: function () {
+                        alert('Unable to get recommendations. Please try again.');
+                    },
+                    complete: function () {
+                        $('#loading-overlay').addClass('hidden');
+                    }
                 });
-
-                if (!response.ok) {
-                    throw new Error('Failed to get recommendations');
-                }
-
-                const data = await response.json();
-                state.recommendations = data;
-
-                // Initialize all plants as selected
-                state.selectedPlants = new Set(data.plants.map(p => p.name));
-
-                displayResults();
-                showStep(3);
-            } catch (error) {
-                console.error('Error getting recommendations:', error);
-                alert('Unable to get recommendations. Please try again.');
-            } finally {
-                hideLoading();
             }
-        }
 
-        function displayResults() {
-            if (!state.recommendations) return;
+            // Display results on step 3
+            function displayResults() {
+                if (!state.recommendations) return;
 
-            // Update zone and season info
-            elements.zoneDisplay.textContent = state.recommendations.zone || '6b';
-            elements.seasonDisplay.textContent = state.recommendations.season || 'Fall Planting Season';
+                // Update zone and season
+                $('#zone-display').text(state.recommendations.zone || '6b');
+                $('#season-display').text(state.recommendations.season || 'Fall Planting Season');
 
-            // Render plants
-            renderPlants();
-            updatePlantCount();
-        }
+                // Render plants
+                renderPlants();
+                updatePlantCount();
+            }
 
-        function renderPlants() {
-            if (!state.recommendations || !state.recommendations.plants) return;
+            // Render plant cards
+            function renderPlants() {
+                const $container = $('#plants-container');
+                $container.empty();
 
-            elements.plantsContainer.innerHTML = '';
+                state.recommendations.plants.forEach(plant => {
+                    const isSelected = state.selectedPlants.has(plant.name);
+                    const plantCard = createPlantCard(plant, isSelected);
+                    $container.append(plantCard);
+                });
+            }
 
-            state.recommendations.plants.forEach(plant => {
-                const plantCard = createPlantCard(plant);
-                elements.plantsContainer.appendChild(plantCard);
-            });
-        }
+            // Create individual plant card
+            function createPlantCard(plant, isSelected) {
+                const cardClass = isSelected ? 'plant-card selected' : 'plant-card dimmed';
 
-        function createPlantCard(plant) {
-            const isSelected = state.selectedPlants.has(plant.name);
-
-            const card = document.createElement('div');
-            card.className = `plant-card ${isSelected ? 'selected' : 'dimmed'}`;
-
-            card.innerHTML = `
-                <div class="plant-header">
-                    <div class="plant-info">
-                        <label style="display: flex; align-items: center; cursor: pointer;">
-                            <input type="checkbox" class="plant-checkbox" ${isSelected ? 'checked' : ''} 
-                                   onchange="togglePlant('${plant.name}')">
-                            <div>
-                                <h3>${plant.name}</h3>
-                                <div class="scientific-name">${plant.scientific_name || ''}</div>
+                return $(`
+                    <div class="${cardClass}" data-plant="${plant.name}">
+                        <div class="plant-header">
+                            <div class="plant-info">
+                                <label style="display: flex; align-items: center; cursor: pointer;">
+                                    <input type="checkbox" class="plant-checkbox" ${isSelected ? 'checked' : ''}>
+                                    <div>
+                                        <h3>${plant.name}</h3>
+                                        <div class="scientific-name">${plant.scientific_name || ''}</div>
+                                    </div>
+                                </label>
                             </div>
-                        </label>
-                    </div>
-                    ${plant.plant_now ? '<div class="plant-now-badge">🏷️ Plant Now</div>' : ''}
-                </div>
+                            ${plant.plant_now ? '<div class="plant-now-badge">🏷️ Plant Now</div>' : ''}
+                        </div>
 
-                <div class="plant-stats">
-                    <div class="stat">
-                        <div class="stat-label">Sun</div>
-                        <div class="stat-value">${plant.sun_requirements || 'Full Sun'}</div>
-                    </div>
-                    <div class="stat">
-                        <div class="stat-label">Water</div>
-                        <div class="stat-value">${plant.water_needs || 'Low'}</div>
-                    </div>
-                    <div class="stat">
-                        <div class="stat-label">Care</div>
-                        <div class="stat-value">${plant.maintenance_level || 'Low'}</div>
-                    </div>
-                    <div class="stat">
-                        <div class="stat-label">Spacing</div>
-                        <div class="stat-value">${plant.spacing || '12-18"'}</div>
-                    </div>
-                </div>
+                        <div class="plant-stats">
+                            <div class="stat">
+                                <div class="stat-label">Sun</div>
+                                <div class="stat-value">${plant.sun_requirements || 'Full Sun'}</div>
+                            </div>
+                            <div class="stat">
+                                <div class="stat-label">Water</div>
+                                <div class="stat-value">${plant.water_needs || 'Low'}</div>
+                            </div>
+                            <div class="stat">
+                                <div class="stat-label">Care</div>
+                                <div class="stat-value">${plant.maintenance_level || 'Low'}</div>
+                            </div>
+                            <div class="stat">
+                                <div class="stat-label">Spacing</div>
+                                <div class="stat-value">${plant.spacing || '12-18"'}</div>
+                            </div>
+                        </div>
 
-                <div class="plant-description">
-                    ${plant.description || 'Native perennial. Attracts pollinators and provides seasonal interest.'}
-                </div>
+                        <div class="plant-description">
+                            ${plant.description || 'Native perennial. Attracts pollinators and provides seasonal interest.'}
+                        </div>
 
-                ${plant.companion_plants ? `
-                    <div class="companions">
-                        <div class="companions-label">Companion Plants:</div>
-                        <div class="companions-list">${plant.companion_plants}</div>
+                        ${plant.companion_plants ? `
+                            <div class="companions">
+                                <div class="companions-label">Companion Plants:</div>
+                                <div class="companions-list">${plant.companion_plants}</div>
+                            </div>
+                        ` : ''}
                     </div>
-                ` : ''}
-            `;
-
-            return card;
-        }
-
-        function togglePlant(plantName) {
-            if (state.selectedPlants.has(plantName)) {
-                state.selectedPlants.delete(plantName);
-            } else {
-                state.selectedPlants.add(plantName);
+                `);
             }
 
-            renderPlants();
-            updatePlantCount();
-        }
+            // Toggle plant selection
+            function togglePlant(plantName) {
+                if (state.selectedPlants.has(plantName)) {
+                    state.selectedPlants.delete(plantName);
+                } else {
+                    state.selectedPlants.add(plantName);
+                }
+                renderPlants();
+                updatePlantCount();
+            }
 
-        function updatePlantCount() {
-            if (!state.recommendations) return;
+            // Update plant selection count
+            function updatePlantCount() {
+                if (!state.recommendations) return;
+                const total = state.recommendations.plants.length;
+                const selected = state.selectedPlants.size;
+                $('#selection-count').text(`${selected} of ${total}`);
+            }
 
-            const total = state.recommendations.plants.length;
-            const selected = state.selectedPlants.size;
-            elements.selectionCount.textContent = `${selected} of ${total}`;
-        }
-
-        // Event listeners
-        function initializeEventListeners() {
-            // Address input
-            elements.addressInput.addEventListener('input', (e) => {
-                state.formData.address = e.target.value;
-                validateCurrentStep();
-            });
-
-            // Button groups
-            setupButtonGroup('direction-buttons', 'direction');
-            setupButtonGroup('water-buttons', 'water');
-            setupButtonGroup('maintenance-buttons', 'maintenance');
-            setupButtonGroup('garden-type-buttons', 'gardenType');
-
-            // Navigation buttons
-            elements.continueToPreferences.addEventListener('click', () => {
-                showStep(2);
-            });
-
-            elements.backToLocation.addEventListener('click', () => {
-                showStep(1);
-            });
-
-            elements.getPlantPlan.addEventListener('click', submitForm);
-
-            elements.startOver.addEventListener('click', () => {
-                // Reset state
+            // Reset form to start over
+            function resetForm() {
                 state.currentStep = 1;
                 state.formData = {
                     address: '',
@@ -919,503 +846,84 @@
                 state.recommendations = null;
                 state.selectedPlants = new Set();
 
-                // Reset form
-                elements.addressInput.value = '';
-                document.querySelectorAll('.option-button').forEach(btn => {
-                    btn.classList.remove('selected');
-                });
+                // Reset UI
+                $('#address').val('');
+                $('.option-button').removeClass('selected');
+                $('#file-upload').html(`
+                    <div class="file-upload-icon">🌱</div>
+                    <p>Click to upload or drag and drop</p>
+                    <div class="help-text">For visual reference only</div>
+                `);
 
                 showStep(1);
-                validateCurrentStep();
+                validateStep();
+            }
+
+            // Event Listeners
+
+            // Address input
+            $('#address').on('input', function () {
+                state.formData.address = $(this).val();
+                validateStep();
             });
 
-            elements.printPlan.addEventListener('click', () => {
-                window.print();
-            });
+            // Button groups
+            setupButtonGroup('direction-buttons', 'direction');
+            setupButtonGroup('water-buttons', 'water');
+            setupButtonGroup('maintenance-buttons', 'maintenance');
+            setupButtonGroup('garden-type-buttons', 'gardenType');
+
+            // Navigation buttons
+            $('#continue-to-preferences').click(() => showStep(2));
+            $('#back-to-location').click(() => showStep(1));
+            $('#get-plant-plan').click(submitForm);
+            $('#start-over').click(resetForm);
+            $('#print-plan').click(() => window.print());
 
             // File upload
-            elements.fileUpload.addEventListener('click', () => {
-                elements.photoInput.click();
-            });
+            $('#file-upload').click(() => $('#photo-input').click());
 
-            elements.photoInput.addEventListener('change', (e) => {
-                const file = e.target.files[0];
+            $('#photo-input').change(function () {
+                const file = this.files[0];
                 if (file) {
                     state.formData.photo = file;
-                    elements.fileUpload.innerHTML = `
+                    $('#file-upload').html(`
                         <div class="file-upload-icon">📷</div>
                         <p>Photo uploaded: ${file.name}</p>
                         <div class="help-text">Click to change photo</div>
-                    `;
+                    `);
                 }
+            });
+
+            // Plant checkbox handling (delegated event)
+            $(document).on('change', '.plant-checkbox', function () {
+                const plantName = $(this).closest('.plant-card').data('plant');
+                togglePlant(plantName);
             });
 
             // Drag and drop for file upload
-            elements.fileUpload.addEventListener('dragover', (e) => {
+            $('#file-upload').on('dragover', function (e) {
                 e.preventDefault();
-                elements.fileUpload.style.borderColor = '#4ade80';
-            });
-
-            elements.fileUpload.addEventListener('dragleave', (e) => {
+                $(this).css('border-color', '#4ade80');
+            }).on('dragleave', function (e) {
                 e.preventDefault();
-                elements.fileUpload.style.borderColor = '#334155';
-            });
-
-            elements.fileUpload.addEventListener('drop', (e) => {
+                $(this).css('border-color', '#334155');
+            }).on('drop', function (e) {
                 e.preventDefault();
-                elements.fileUpload.style.borderColor = '#334155';
+                $(this).css('border-color', '#334155');
 
-                const files = e.dataTransfer.files;
+                const files = e.originalEvent.dataTransfer.files;
                 if (files.length > 0 && files[0].type.startsWith('image/')) {
                     state.formData.photo = files[0];
-                    elements.fileUpload.innerHTML = `
+                    $(this).html(`
                         <div class="file-upload-icon">📷</div>
                         <p>Photo uploaded: ${files[0].name}</p>
                         <div class="help-text">Click to change photo</div>
-                    `;
+                    `);
                 }
             });
-        }
 
-        // Initialize the application
-        document.addEventListener('DOMContentLoaded', () => {
-            initializeEventListeners();
-            validateCurrentStep();
+            // Initialize
+            validateStep();
         });
-
-        // Make togglePlant available globally for onclick handlers
-        window.togglePlant = togglePlant;
     </script>
-
-    function GardenPlanner() {
-    const [step, setStep] = useState(1);
-    const [formData, setFormData] = useState({
-    location: '',
-    direction: '',
-    maintenance: '',
-    water: '',
-    garden_type: '',
-    photo: null
-    });
-    const [recommendations, setRecommendations] = useState(null);
-    const [selectedPlants, setSelectedPlants] = useState(new Set());
-    const [generatedImage, setGeneratedImage] = useState(null);
-    const [loading, setLoading] = useState(false);
-    const [generatingImage, setGeneratingImage] = useState(false);
-
-    const [error, setError] = useState(null);
-    const [retryCount, setRetryCount] = useState(0);
-
-    const handleSubmit = async (e, isRetry = false) => {
-    e?.preventDefault();
-    setLoading(true);
-    setError(null);
-
-    if (!isRetry) {
-    setRetryCount(0);
-    }
-
-    try {
-    const requestData = {
-    location: formData.location,
-    direction: formData.direction,
-    water: formData.water,
-    maintenance: formData.maintenance,
-    garden_type: formData.garden_type
-    };
-
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 second timeout
-
-    const response = await fetch('/api/recommendations', {
-    method: 'POST',
-    headers: {
-    'Content-Type': 'application/json',
-    },
-    body: JSON.stringify(requestData),
-    signal: controller.signal
-    });
-
-    clearTimeout(timeoutId);
-
-    if (!response.ok) {
-    const errorData = await response.json();
-    const errorDetail = errorData.detail || {};
-
-    // Create a more user-friendly error message
-    let userMessage = 'Unable to generate plant recommendations. ';
-
-    if (response.status === 503) {
-    userMessage += 'The recommendation service is currently unavailable.';
-    } else if (response.status === 429) {
-    userMessage += 'Too many requests. Please wait a moment and try again.';
-    } else if (response.status === 504) {
-    userMessage += 'The request timed out. Please try again.';
-    } else {
-    userMessage += errorDetail.message || 'Please try again.';
-    }
-
-    const error = new Error(userMessage);
-    error.retryable = errorDetail.retry_suggested !== false;
-    error.statusCode = response.status;
-    throw error;
-    }
-
-    const data = await response.json();
-    setRecommendations(data);
-
-    // Initialize all plants as selected
-    const allPlantNames = data.plants.map(p => p.name);
-    setSelectedPlants(new Set(allPlantNames));
-    setRetryCount(0); // Reset retry count on success
-    setStep(3);
-    } catch (err) {
-    console.error('Error getting recommendations:', err);
-
-    if (err.name === 'AbortError') {
-    setError('Request timed out. Please check your connection and try again.');
-    } else {
-    setError(err.message);
-    }
-
-    // Set retry count for display
-    if (isRetry) {
-    setRetryCount(prev => prev + 1);
-    }
-    } finally {
-    setLoading(false);
-    }
-    };
-
-    const handleRetry = () => {
-    handleSubmit(null, true);
-    };
-
-    const togglePlant = (plantName) => {
-    const newSelected = new Set(selectedPlants);
-    if (newSelected.has(plantName)) {
-    newSelected.delete(plantName);
-    } else {
-    newSelected.add(plantName);
-    }
-    setSelectedPlants(newSelected);
-    };
-
-    const generateLandscapeImage = async () => {
-    setGeneratingImage(true);
-    // Simulate API call to image generation service
-    setTimeout(() => {
-    // Mock generated image
-    setGeneratedImage('/api/placeholder/800/600');
-    setGeneratingImage(false);
-    }, 3000);
-    };
-
-    const handleInputChange = (field, value) => {
-    setFormData({ ...formData, [field]: value });
-    };
-
-    return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-green-900 p-4">
-        <div className="max-w-4xl mx-auto">
-            {/* Header */}
-            <div className="text-center mb-8 pt-8">
-                <div className="flex items-center justify-center gap-2 mb-2">
-                    <Leaf className="w-10 h-10 text-green-400" />
-                    <h1 className="text-4xl font-bold text-green-100">Smart Garden Planner</h1>
-                </div>
-                <p className="text-green-300">AI-powered native plant recommendations for your yard</p>
-            </div>
-
-            {/* Progress Steps */}
-            <div className="flex justify-center gap-4 mb-8">
-                <div className={`flex items-center gap-2 px-4 py-2 rounded-full ${step>= 1 ? 'bg-green-600 text-white' :
-                    'bg-gray-700 text-gray-400'}`}>
-                    <span className="font-semibold">1</span>
-                    <span>Location</span>
-                </div>
-                <div className={`flex items-center gap-2 px-4 py-2 rounded-full ${step>= 2 ? 'bg-green-600 text-white' :
-                    'bg-gray-700 text-gray-400'}`}>
-                    <span className="font-semibold">2</span>
-                    <span>Preferences</span>
-                </div>
-                <div className={`flex items-center gap-2 px-4 py-2 rounded-full ${step>= 3 ? 'bg-green-600 text-white' :
-                    'bg-gray-700 text-gray-400'}`}>
-                    <span className="font-semibold">3</span>
-                    <span>Results</span>
-                </div>
-            </div>
-
-            {/* Step 1: Location */}
-            {step === 1 && (
-            <div className="bg-gray-800 rounded-lg shadow-2xl p-8 border border-gray-700 fade-in">
-                <h2 className="text-2xl font-bold text-green-400 mb-6 flex items-center gap-2">
-                    <MapPin className="w-6 h-6" />
-                    Tell us about your location
-                </h2>
-
-                <div className="space-y-6">
-                    <div>
-                        <label className="block text-sm font-semibold text-gray-200 mb-2">
-                            Your Address
-                        </label>
-                        <input type="text" placeholder="123 Main St, Denver, CO 80202"
-                            className="w-full px-4 py-3 bg-gray-700 border-2 border-gray-600 rounded-lg focus:border-green-500 focus:outline-none text-white placeholder-gray-400"
-                            value={formData.location} onChange={(e)=> handleInputChange('location', e.target.value)}
-                        />
-                        <p className="text-sm text-gray-400 mt-1">We'll auto-detect your USDA Hardiness Zone</p>
-                    </div>
-
-                    <div>
-                        <label className="block text-sm font-semibold text-gray-200 mb-2">
-                            Which direction does your yard face?
-                        </label>
-                        <div className="grid grid-cols-4 gap-2">
-                            {['N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW'].map((dir) => (
-                            <button key={dir} onClick={()=> handleInputChange('direction', dir)}
-                                className={`py-3 px-4 rounded-lg font-semibold transition-colors ${
-                                formData.direction === dir
-                                ? 'bg-green-600 text-white'
-                                : 'bg-gray-700 text-gray-200 hover:bg-gray-600 border border-gray-600'
-                                }`}
-                                >
-                                {dir}
-                            </button>
-                            ))}
-                        </div>
-                        <p className="text-sm text-gray-400 mt-1">
-                            N = Shade • S = Full Sun • E/W = Partial Sun
-                        </p>
-                    </div>
-
-                    <div>
-                        <label className="block text-sm font-semibold text-gray-200 mb-2">
-                            Upload a photo of your yard (optional)
-                        </label>
-                        <div
-                            className="border-2 border-dashed border-gray-600 rounded-lg p-8 text-center hover:border-green-500 transition-colors cursor-pointer bg-gray-700/50">
-                            <Sprout className="w-12 h-12 text-gray-400 mx-auto mb-2" />
-                            <p className="text-gray-300">Click to upload or drag and drop</p>
-                            <p className="text-sm text-gray-400">For visual reference only</p>
-                        </div>
-                    </div>
-
-                    <button onClick={()=> setStep(2)}
-                        disabled={!formData.location || !formData.direction}
-                        className="w-full bg-green-600 text-white py-3 rounded-lg font-semibold hover:bg-green-700
-                        transition-colors disabled:bg-gray-700 disabled:text-gray-500 disabled:cursor-not-allowed"
-                        >
-                        Continue to Preferences
-                    </button>
-                </div>
-            </div>
-            )}
-
-            {/* Step 2: Preferences */}
-            {step === 2 && (
-            <div className="bg-gray-800 rounded-lg shadow-2xl p-8 border border-gray-700 relative fade-in">
-                <h2 className="text-2xl font-bold text-green-400 mb-6">
-                    What are your gardening preferences?
-                </h2>
-
-                {error && (
-                <div className="bg-red-900/50 border border-red-700 rounded-lg p-4 mb-6">
-                    <div className="flex items-start justify-between">
-                        <div className="flex-1">
-                            <p className="text-red-300 font-semibold mb-2">Unable to get recommendations</p>
-                            <p className="text-red-200 mb-3">{error}</p>
-                            {retryCount > 0 && (
-                            <p className="text-red-400 text-sm">Retry attempt: {retryCount}</p>
-                            )}
-                        </div>
-                    </div>
-                    <div className="flex gap-2 mt-3">
-                        <button onClick={handleRetry} disabled={loading}
-                            className="bg-red-700 hover:bg-red-600 disabled:bg-red-800 disabled:cursor-not-allowed text-white px-4 py-2 rounded-lg font-semibold transition-colors">
-                            {loading ? 'Retrying...' : 'Try Again'}
-                        </button>
-                        <button onClick={()=> setError(null)}
-                            className="bg-gray-700 hover:bg-gray-600 text-gray-200 px-4 py-2 rounded-lg font-semibold
-                            transition-colors"
-                            >
-                            Dismiss
-                        </button>
-                    </div>
-                </div>
-                )}
-
-                <form onSubmit={handleSubmit} className="space-y-6">
-                    <div>
-                        <label className="block text-sm font-semibold text-gray-200 mb-2 flex items-center gap-2">
-                            <Droplets className="w-5 h-5" />
-                            Water Availability
-                        </label>
-                        <div className="grid grid-cols-3 gap-2">
-                            {['Low', 'Medium', 'High'].map((level) => (
-                            <button key={level} type="button" onClick={()=> handleInputChange('water', level)}
-                                className={`py-3 px-4 rounded-lg font-semibold transition-colors ${
-                                formData.water === level
-                                ? 'bg-blue-600 text-white'
-                                : 'bg-gray-700 text-gray-200 hover:bg-gray-600 border border-gray-600'
-                                }`}
-                                >
-                                {level}
-                            </button>
-                            ))}
-                        </div>
-                    </div>
-
-                    <div>
-                        <label className="block text-sm font-semibold text-gray-200 mb-2 flex items-center gap-2">
-                            <Sun className="w-5 h-5" />
-                            Maintenance Level
-                        </label>
-                        <div className="grid grid-cols-3 gap-2">
-                            {['Low', 'Medium', 'High'].map((level) => (
-                            <button key={level} type="button" onClick={()=> handleInputChange('maintenance', level)}
-                                className={`py-3 px-4 rounded-lg font-semibold transition-colors ${
-                                formData.maintenance === level
-                                ? 'bg-orange-600 text-white'
-                                : 'bg-gray-700 text-gray-200 hover:bg-gray-600 border border-gray-600'
-                                }`}
-                                >
-                                {level}
-                            </button>
-                            ))}
-                        </div>
-                    </div>
-
-                    <div>
-                        <label className="block text-sm font-semibold text-gray-200 mb-2 flex items-center gap-2">
-                            <Leaf className="w-5 h-5" />
-                            Garden Type
-                        </label>
-                        <div className="grid grid-cols-2 gap-2">
-                            {['Native Plants', 'Flower Garden', 'Vegetable Garden', 'Mixed Garden'].map((type) => (
-                            <button key={type} type="button" onClick={()=> handleInputChange('garden_type', type)}
-                                className={`py-3 px-4 rounded-lg font-semibold transition-colors ${
-                                formData.garden_type === type
-                                ? 'bg-green-600 text-white'
-                                : 'bg-gray-700 text-gray-200 hover:bg-gray-600 border border-gray-600'
-                                }`}
-                                >
-                                {type}
-                            </button>
-                            ))}
-                        </div>
-                    </div>
-
-                    <div className="flex gap-4">
-                        <button type="button" onClick={()=> setStep(1)}
-                            className="flex-1 bg-gray-700 text-gray-200 py-3 rounded-lg font-semibold hover:bg-gray-600
-                            transition-colors border border-gray-600"
-                            >
-                            Back
-                        </button>
-                        <button type="submit" disabled={!formData.water || !formData.maintenance ||
-                            !formData.garden_type || loading}
-                            className="flex-1 bg-green-600 text-white py-3 rounded-lg font-semibold hover:bg-green-700 transition-colors disabled:bg-gray-700 disabled:text-gray-500 disabled:cursor-not-allowed flex items-center justify-center gap-2">
-                            {loading &&
-                            <Loader2 className="w-5 h-5 animate-spin" />}
-                            {loading ? 'Generating Plan...' : 'Get My Plant Plan'}
-                        </button>
-                    </div>
-                </form>
-
-                {/* Loading overlay */}
-                {loading && (
-                <div className="absolute inset-0 bg-gray-900/75 rounded-lg flex items-center justify-center">
-                    <div className="bg-gray-800 p-6 rounded-lg border border-gray-700 text-center">
-                        <Loader2 className="w-8 h-8 animate-spin text-green-400 mx-auto mb-3" />
-                        <p className="text-green-300 font-semibold">Generating your personalized plant
-                            recommendations...</p>
-                        <p className="text-gray-400 text-sm mt-1">This may take up to 30 seconds</p>
-                    </div>
-                </div>
-                )}
-            </div>
-            )}
-
-            {/* Step 3: Results */}
-            {step === 3 && recommendations && (
-            <div className="space-y-6 fade-in">
-                {/* Location and Season Info */}
-                <div className="bg-gray-800 rounded-lg shadow-2xl p-6 border border-gray-700">
-                    <div className="flex items-center justify-between">
-                        <div>
-                            <h3 className="text-lg font-semibold text-gray-300">Location</h3>
-                            <p className="text-2xl font-bold text-green-400">{recommendations.location}</p>
-                        </div>
-                        <div className="text-right">
-                            <h3 className="text-lg font-semibold text-gray-300">Current Season</h3>
-                            <p className="text-xl font-bold text-orange-400">{recommendations.season}</p>
-                        </div>
-                    </div>
-                </div>
-
-                {/* Selection Summary */}
-                {selectedPlants.size > 0 && (
-                <div className="bg-green-900/30 border border-green-700 rounded-lg p-4">
-                    <div className="flex items-center justify-between">
-                        <div>
-                            <h3 className="text-lg font-semibold text-green-300">Your Garden Selection</h3>
-                            <p className="text-green-200">
-                                {selectedPlants.size} plant{selectedPlants.size !== 1 ? 's' : ''} selected for your
-                                {formData.garden_type.toLowerCase()} in {formData.location}
-                            </p>
-                            {(() => {
-                            const selectedPlantObjects = recommendations.plants.filter(p => selectedPlants.has(p.name));
-                            const plantNowCount = selectedPlantObjects.filter(p => p.plant_now).length;
-                            return plantNowCount > 0 && (
-                            <p className="text-orange-300 text-sm mt-1">
-                                {plantNowCount} can be planted now
-                            </p>
-                            );
-                            })()}
-                        </div>
-                        <div className="text-right">
-                            <p className="text-2xl font-bold text-green-400">{selectedPlants.size}</p>
-                            <p className="text-sm text-green-300">Plants</p>
-                        </div>
-                    </div>
-                    <div className="mt-3 flex flex-wrap gap-2">
-                        {Array.from(selectedPlants).map(plantName => {
-                        const plant = recommendations.plants.find(p => p.name === plantName);
-                        return (
-                        <span key={plantName} className={`px-3 py-1 rounded-full text-sm border ${ plant?.plant_now
-                            ? 'bg-orange-800/50 text-orange-200 border-orange-600'
-                            : 'bg-green-800/50 text-green-200 border-green-600' }`}>
-                            {plantName}
-                            {plant?.plant_now && ' ⭐'}
-                        </span>
-                        );
-                        })}
-                    </div>
-                </div>
-                )}
-
-                {/* Plant Recommendations */}
-                <div className="bg-gray-800 rounded-lg shadow-2xl p-6 border border-gray-700">
-                    <div className="flex items-center justify-between mb-4">
-                        <h2 className="text-2xl font-bold text-green-400 flex items-center gap-2">
-                            <Leaf className="w-6 h-6" />
-                            Recommended Plants for Your Yard
-                        </h2>
-                        <div className="flex items-center gap-4">
-                            <div className="text-right">
-                                <span className="text-lg font-semibold text-green-300">
-                                    {selectedPlants.size} of {recommendations.plants.length}
-                                </span>
-                                <p className="text-sm text-gray-400">selected</p>
-                            </div>
-                            <button onClick={()=> {
-                                if (selectedPlants.size === recommendations.plants.length) {
-                                setSelectedPlants(new Set());
-                                } else {
-                                setSelectedPlants(new Set(recommendations.plants.map(p => p.name)));
-                                }
-                                }}
-                                className="bg-green-700 hover:bg-green-600 text-white px-3 py-1 rounded-lg text-sm
-                                font-semibold transition-colors"
-                                >
-                                {selectedPlants.size === recommendations.plants.lengt
