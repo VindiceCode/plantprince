@@ -1,302 +1,133 @@
 # Smart Garden Planner
 
-AI-powered plant recommendations using Digital Ocean's LLM services. This ultra-minimal application provides personalized plant recommendations based on location and gardening preferences.
+AI-powered plant recommendations using your custom GenAI Agent API.
 
-## Quick Start with Docker
+## Quick Start
 
-The fastest way to get started is using Docker:
-
-1. **Clone and setup environment:**
-   ```bash
-   git clone <repository-url>
-   cd smart-garden-planner
-   cp .env.example .env
-   ```
-
-2. **Configure your Digital Ocean LLM API:**
-   Edit `.env` and add your Digital Ocean LLM credentials:
-   ```bash
-   DIGITAL_OCEAN_LLM_API_KEY=your_api_key_here
-   DIGITAL_OCEAN_LLM_ENDPOINT=your_endpoint_here
-   ```
-
-3. **Run with Docker Compose:**
-   ```bash
-   docker-compose up --build
-   ```
-
-4. **Access the application:**
-   - API: http://localhost:8000
-   - API Documentation: http://localhost:8000/docs
-   - Health Check: http://localhost:8000/health
-
-## Development Setup
-
-### Prerequisites
-
-- Python 3.11+
-- [uv](https://docs.astral.sh/uv/getting-started/installation/) for dependency management
-- Docker and Docker Compose (for containerized development)
-
-### Local Development (without Docker)
-
-1. **Install dependencies:**
-   ```bash
-   uv sync
-   ```
-
-2. **Setup environment:**
-   ```bash
-   cp .env.example .env
-   # Edit .env with your Digital Ocean LLM credentials
-   ```
-
-3. **Run the development server:**
-   ```bash
-   uv run uvicorn main:app --reload
-   ```
-
-4. **Access the API at http://localhost:8000**
-
-### Docker Development
-
-#### Development Mode (with hot reload)
+### 1. Start the API Server
 ```bash
-# Build and run with hot reload
-docker-compose up --build
-
-# Run in background
-docker-compose up -d --build
-
-# View logs
-docker-compose logs -f api
-
-# Stop services
-docker-compose down
+./run_api.sh
 ```
 
-#### Production Mode
+### 2. Open the Frontend
+Open `frontend/index.html` in your browser or serve it with:
 ```bash
-# Build production image
-docker build -t smart-garden-planner .
-
-# Run with environment variables (managed by Terraform in production)
-docker run -p 8000:8000 \
-  -e DIGITAL_OCEAN_LLM_API_KEY=$DIGITAL_OCEAN_LLM_API_KEY \
-  -e DIGITAL_OCEAN_LLM_ENDPOINT=$DIGITAL_OCEAN_LLM_ENDPOINT \
-  -e ENVIRONMENT=production \
-  smart-garden-planner
-
-# Or with .env file for local testing
-docker run -p 8000:8000 --env-file .env smart-garden-planner
+python serve_frontend.py
 ```
 
-## Configuration
+That's it! The app will be running at:
+- **Backend**: http://localhost:8001
+- **Frontend**: Open `frontend/index.html` in browser
+- **API Docs**: http://localhost:8001/docs
 
-### Required Environment Variables
+## How It Works
 
-Create a `.env` file based on `.env.example`:
+1. **Backend**: `backend/services/requestinfo.py` - FastAPI app with GenAI Agent integration
+2. **Frontend**: `frontend/index.html` - Static HTML with jQuery
+3. **GenAI Integration**: Calls your custom GenAI Agent API for plant recommendations
+4. **Smart Fallback**: Returns realistic mock plant data if GenAI Agent isn't configured
+
+## Environment Variables
+
+The API will work with mock data by default. To use your GenAI Agent, create `backend/.env`:
 
 ```bash
-# Digital Ocean LLM API Configuration (REQUIRED)
-DIGITAL_OCEAN_LLM_API_KEY=your_api_key_here
-DIGITAL_OCEAN_LLM_ENDPOINT=your_endpoint_here
-
-# Digital Ocean Spaces Configuration (OPTIONAL - for request/response backup)
-DO_SPACES_KEY=your_spaces_access_key_here
-DO_SPACES_SECRET=your_spaces_secret_key_here
-DO_SPACES_ENDPOINT=https://nyc3.digitaloceanspaces.com
-DO_SPACES_REGION=nyc3
-DO_SPACES_BUCKET=garden-planner-logs
-
-# Application Configuration
-ENVIRONMENT=development
-DEBUG=true
-
-# Database Configuration
-DATABASE_URL=sqlite+aiosqlite:///./garden_planner.db
-
-# Optional: Logging Configuration
-LOG_LEVEL=INFO
+# GenAI Agent API Configuration
+DO_AGENT_API_KEY=your_api_key_here
+DO_AGENT_BASE_URL=https://your-agent-url.agents.do-ai.run
 ```
 
-### Digital Ocean Setup
+## Using the App
 
-1. **LLM API Access:**
-   - Sign up for Digital Ocean
-   - Enable LLM services in your account
-   - Generate API key and endpoint URL
+1. **Fill out the garden form:**
+   - Location (e.g., "Denver, CO")
+   - Yard direction (N, S, E, W, NE, SE, SW, NW)
+   - Water availability (Low, Medium, High)
+   - Maintenance level (Low, Medium, High)
+   - Garden type (Native Plants, Flower Garden, Vegetable Garden, Mixed)
 
-2. **Spaces (Optional):**
-   - Create a Digital Ocean Space for request/response logging
-   - Generate Spaces access keys
+2. **Click "Get My Plant Plan"**
 
-3. **Environment Management:**
-   - **Local Development:** Use `.env` file for local testing
-   - **Production/Staging:** Environment variables managed via Terraform
-   - **Docker:** Environment variables passed through container runtime
+3. **View your personalized recommendations:**
+   - 4-6 native plants suited to your location and preferences
+   - Plant details: sun requirements, water needs, maintenance level
+   - Planting timing (can plant now or wait for season)
+   - Companion plant suggestions
+   - Care instructions
 
-## API Usage
+4. **Customize your selection:**
+   - Check/uncheck plants to customize your garden plan
+   - View selection count
+   - Print your final garden plan
 
-### Get Plant Recommendations
+## API Endpoints
 
-```bash
-curl -X POST "http://localhost:8000/api/recommendations" \
-     -H "Content-Type: application/json" \
-     -d '{
-       "location": "Denver, CO",
-       "direction": "S",
-       "water": "Low",
-       "maintenance": "Low",
-       "garden_type": "Native Plants"
-     }'
-```
-
-### Response Format
-
-```json
-{
-  "location": "Denver, CO",
-  "season": "Fall Planting Season",
-  "plants": [
-    {
-      "name": "Blue Grama Grass",
-      "scientific": "Bouteloua gracilis",
-      "sun": "Full Sun",
-      "water": "Low",
-      "maintenance": "Low",
-      "plant_now": true,
-      "care_instructions": "Drought tolerant once established...",
-      "notes": "Perfect for low-water gardens..."
-    }
-  ],
-  "generated_by": "llm"
-}
-```
-
-## Project Structure
-
-```
-├── main.py                 # FastAPI application entry point
-├── config.py               # Environment configuration management
-├── models/                 # Data models and database
-│   ├── database.py         # Database connection and setup
-│   └── schemas.py          # Pydantic models for API
-├── services/               # Business logic and external services
-│   ├── llm_service.py      # Digital Ocean LLM integration
-│   ├── logging_service.py  # Request/response logging
-│   └── storage.py          # Digital Ocean Spaces integration
-├── routes/                 # API route handlers
-│   └── recommendations.py  # Plant recommendation endpoints
-├── pyproject.toml          # Project configuration and dependencies
-├── Dockerfile              # Container configuration
-├── docker-compose.yml      # Development orchestration
-├── .env.example            # Environment variables template
-└── README.md               # This file
-```
-
-## Database
-
-The application uses SQLite for simplicity:
-- **Development:** Local SQLite file
-- **Docker:** Persistent volume for database storage
-- **Schema:** Minimal logging of requests and responses
+- `GET /` - Root endpoint
+- `GET /health` - Health check  
+- `POST /api/recommendations` - Get plant recommendations
+- `GET /docs` - Interactive API documentation
 
 ## Troubleshooting
 
-### Common Issues
-
-1. **LLM API Errors:**
-   - Verify your Digital Ocean LLM API key and endpoint
-   - Check API quota and billing status
-   - Review logs for specific error messages
-
-2. **Docker Issues:**
-   ```bash
-   # Rebuild containers
-   docker-compose down
-   docker-compose up --build
-
-   # Clear volumes (will reset database)
-   docker-compose down -v
-   ```
-
-3. **Database Issues:**
-   ```bash
-   # Reset database in Docker
-   docker-compose down -v
-   docker-compose up --build
-   ```
-
-### Logs
-
+**Port already in use:**
 ```bash
-# View application logs
-docker-compose logs -f api
-
-# View all logs
-docker-compose logs -f
+# Kill any process on port 8001
+lsof -ti:8001 | xargs kill -9
 ```
 
-## Terraform Integration
-
-This application is designed to work with Terraform-managed infrastructure:
-
-### Environment Variables via Terraform
-
-The application expects these environment variables to be provided by your Terraform configuration:
-
-```hcl
-# Example Terraform variables for container deployment
-resource "digitalocean_app" "garden_planner" {
-  spec {
-    name   = "smart-garden-planner"
-    region = "nyc"
-
-    service {
-      name               = "api"
-      environment_slug   = "python"
-      instance_count     = 1
-      instance_size_slug = "basic-xxs"
-
-      env {
-        key   = "DIGITAL_OCEAN_LLM_API_KEY"
-        value = var.do_llm_api_key
-        type  = "SECRET"
-      }
-
-      env {
-        key   = "DIGITAL_OCEAN_LLM_ENDPOINT"
-        value = var.do_llm_endpoint
-      }
-
-      env {
-        key   = "ENVIRONMENT"
-        value = "production"
-      }
-
-      # Optional: Digital Ocean Spaces
-      env {
-        key   = "DO_SPACES_KEY"
-        value = var.do_spaces_key
-        type  = "SECRET"
-      }
-    }
-  }
-}
+**Permission errors with .venv:**
+```bash
+# Clean up and let uv recreate
+sudo rm -rf backend/.venv
+./run_api.sh
 ```
 
-### Local Development vs Production
+**CORS errors:**
+- Make sure you're serving the HTML file via HTTP (use `python serve_frontend.py`)
+- Don't open `index.html` directly in browser
 
-- **Local:** Use `.env` file for development and testing
-- **Production:** Environment variables injected by Terraform/infrastructure
-- **Docker:** Supports both `.env` files and runtime environment variables
+**No plant recommendations:**
+- Check that the API is running on http://localhost:8001
+- The system works with mock data even without GenAI Agent configured
 
-## Development Notes
+## Development
 
-- The application prioritizes simplicity and rapid development
-- Only Digital Ocean LLM service is used for plant recommendations
-- No external plant databases or complex APIs
-- SQLite database for minimal setup complexity
-- Optional Digital Ocean Spaces for request/response backup
-- Environment configuration designed for Terraform management
+**View logs:**
+The API server shows real-time logs including:
+- GenAI Agent configuration status
+- API requests and responses
+- Error messages
+
+**Test the API directly:**
+```bash
+python test_connection.py
+```
+
+**Restart after changes:**
+The server auto-reloads when you modify the code.
+
+## Features
+
+✅ **Works immediately** - Mock data fallback  
+✅ **GenAI Agent integration** - Real AI recommendations when configured  
+✅ **Location-aware** - USDA hardiness zones and seasonal planting  
+✅ **Native plant focus** - Environmentally friendly recommendations  
+✅ **Interactive UI** - Select/deselect plants, view details  
+✅ **Responsive design** - Works on desktop and mobile  
+✅ **No Docker required** - Simple Python setup with uv
+
+## Architecture
+
+```
+Smart Garden Planner
+├── frontend/
+│   └── index.html          # Static HTML frontend
+├── backend/
+│   ├── services/
+│   │   └── requestinfo.py  # FastAPI app
+│   └── .env               # Environment variables
+├── run_api.sh             # Start script
+└── serve_frontend.py      # Frontend server
+```
+
+The app uses a simple architecture with a FastAPI backend that integrates with your GenAI Agent API and a static HTML frontend. No complex build processes or Docker required!
