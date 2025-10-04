@@ -70,7 +70,7 @@
     - Add example .env file with DO LLM and Spaces placeholder values
     - _Requirements: All_
 
-- [-] 6. Integration testing and demo preparation
+- [ ] 6. Integration testing and demo preparation
   - [ ] 6.1 Test complete user flow with Docker
     - Test location input and LLM recommendation generation
     - Verify plant selection and display functionality

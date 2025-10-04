@@ -1,6 +1,6 @@
 services:
-  api:
-    build: .
+  backend:
+    build: ./backend
     ports:
       - "8000:8000"
     environment:
@@ -8,9 +8,9 @@ services:
       - DEBUG=true
       - DATABASE_URL=sqlite+aiosqlite:///./data/garden_planner.db
     env_file:
-      - .env
+      - ./backend/.env
     volumes:
-      - .:/app
+      - ./backend:/app
       - /app/__pycache__
       - sqlite_data:/app/data  # SQLite database volume
     command: uv run uvicorn main:app --host 0.0.0.0 --port 8000 --reload
@@ -20,25 +20,28 @@ services:
 
   # Database initialization service
   db-init:
-    build: .
+    build: ./backend
     volumes:
       - sqlite_data:/app/data
     env_file:
-      - .env
+      - ./backend/.env
     command: uv run python -c "import asyncio; from models.database import init_database; asyncio.run(init_database())"
     restart: "no"
 
-  # Frontend service (for future integration)
-  # frontend:
-  #   build:
-  #     context: ./frontend
-  #     dockerfile: Dockerfile
-  #   ports:
-  #     - "3000:3000"
-  #   depends_on:
-  #     - api
-  #   environment:
-  #     - REACT_APP_API_URL=http://localhost:8000
+  # Frontend service
+  frontend:
+    build: ./frontend
+    ports:
+      - "3000:3000"
+    depends_on:
+      - backend
+    environment:
+      - REACT_APP_API_URL=http://localhost:8000
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+    stdin_open: true
+    tty: true
 
 volumes:
   sqlite_data:
