@@ -1,5 +1,5 @@
 """
-Digital Ocean LLM service interface for plant recommendations.
+GenAI Agent API service interface for plant recommendations.
 """
 import os
 import json
@@ -9,27 +9,37 @@ from datetime import datetime
 from typing import Dict, Any, Optional
 from models.schemas import RecommendationRequest, RecommendationResponse, Plant
 
+# Ensure environment variables are loaded
+try:
+    from dotenv import load_dotenv
+    load_dotenv()
+except ImportError:
+    pass
+
 logger = logging.getLogger(__name__)
 
 
-class DigitalOceanLLMService:
-    """Service for interacting with Digital Ocean LLM API."""
+class GenAIAgentService:
+    """Service for interacting with GenAI Agent API."""
     
     def __init__(self):
-        """Initialize the LLM service."""
-        self.api_key = os.getenv("DO_LLM_API_KEY")
-        self.endpoint = os.getenv("DO_LLM_ENDPOINT")
-        self.model = os.getenv("DO_LLM_MODEL", "meta-llama/Meta-Llama-3.1-8B-Instruct")
+        """Initialize the GenAI Agent service."""
+        self.api_key = os.getenv("GENAI_API_KEY")
+        self.endpoint = os.getenv("GENAI_ENDPOINT")
         self.timeout = int(os.getenv("LLM_TIMEOUT", "30"))
         self.max_tokens = int(os.getenv("LLM_MAX_TOKENS", "2000"))
+        
+        # Debug logging
+        logger.debug(f"GENAI_API_KEY present: {bool(self.api_key)}")
+        logger.debug(f"GENAI_ENDPOINT: {self.endpoint}")
         
         self.enabled = self._is_configured()
         
         if not self.enabled:
-            logger.warning("Digital Ocean LLM service not configured")
+            logger.warning("GenAI Agent service not configured")
     
     def _is_configured(self) -> bool:
-        """Check if LLM service is properly configured."""
+        """Check if GenAI Agent service is properly configured."""
         return all([
             self.api_key and self.api_key.strip(),
             self.endpoint and self.endpoint.strip()
@@ -109,7 +119,7 @@ Respond with ONLY the JSON object, no additional text."""
     
     async def get_recommendations(self, request: RecommendationRequest) -> RecommendationResponse:
         """
-        Get plant recommendations from Digital Ocean LLM service.
+        Get plant recommendations from GenAI Agent service.
         
         Args:
             request: The recommendation request with user preferences
@@ -118,21 +128,20 @@ Respond with ONLY the JSON object, no additional text."""
             RecommendationResponse with plant recommendations
             
         Raises:
-            Exception: If LLM service fails or returns invalid data
+            Exception: If GenAI Agent service fails or returns invalid data
         """
         if not self.enabled:
-            raise Exception("LLM service not configured")
+            raise Exception("GenAI Agent service not configured")
         
         prompt = self._create_prompt(request)
         
-        # Prepare the API request
+        # Prepare the API request for GenAI Agent API
         headers = {
             "Authorization": f"Bearer {self.api_key}",
             "Content-Type": "application/json"
         }
         
         payload = {
-            "model": self.model,
             "messages": [
                 {
                     "role": "user",
@@ -141,15 +150,19 @@ Respond with ONLY the JSON object, no additional text."""
             ],
             "max_tokens": self.max_tokens,
             "temperature": 0.7,
-            "top_p": 0.9
+            "top_p": 0.9,
+            "stream": False
         }
         
         try:
             async with httpx.AsyncClient(timeout=self.timeout) as client:
-                logger.info(f"Sending LLM request for location: {request.location}")
+                logger.info(f"Sending GenAI Agent request for location: {request.location}")
+                
+                # Use the correct endpoint path for GenAI Agent API
+                api_url = f"{self.endpoint.rstrip('/')}/api/v1/chat/completions"
                 
                 response = await client.post(
-                    self.endpoint,
+                    api_url,
                     headers=headers,
                     json=payload
                 )
@@ -159,27 +172,27 @@ Respond with ONLY the JSON object, no additional text."""
                 # Parse the response
                 response_data = response.json()
                 
-                # Extract the content from the LLM response
+                # Extract the content from the GenAI Agent response
                 if "choices" not in response_data or not response_data["choices"]:
-                    raise Exception("Invalid LLM response format: no choices")
+                    raise Exception("Invalid GenAI Agent response format: no choices")
                 
                 content = response_data["choices"][0].get("message", {}).get("content", "")
                 
                 if not content:
-                    raise Exception("Empty response from LLM service")
+                    raise Exception("Empty response from GenAI Agent service")
                 
                 # Parse the JSON content
                 try:
                     recommendation_data = json.loads(content.strip())
                 except json.JSONDecodeError as e:
-                    logger.error(f"Failed to parse LLM JSON response: {content}")
-                    raise Exception(f"Invalid JSON response from LLM: {str(e)}")
+                    logger.error(f"Failed to parse GenAI Agent JSON response: {content}")
+                    raise Exception(f"Invalid JSON response from GenAI Agent: {str(e)}")
                 
                 # Validate and create the response model
                 try:
                     # Ensure we have the required fields
                     if "plants" not in recommendation_data:
-                        raise ValueError("Missing 'plants' field in LLM response")
+                        raise ValueError("Missing 'plants' field in GenAI Agent response")
                     
                     # Validate each plant
                     validated_plants = []
@@ -192,40 +205,40 @@ Respond with ONLY the JSON object, no additional text."""
                             continue
                     
                     if not validated_plants:
-                        raise Exception("No valid plants in LLM response")
+                        raise Exception("No valid plants in GenAI Agent response")
                     
                     # Create the final response
                     response_obj = RecommendationResponse(
                         location=recommendation_data.get("location", request.location),
                         season=recommendation_data.get("season", self._get_current_season()),
                         plants=validated_plants,
-                        generated_by="llm"
+                        generated_by="genai_agent"
                     )
                     
                     logger.info(f"Successfully generated {len(validated_plants)} plant recommendations")
                     return response_obj
                     
                 except Exception as e:
-                    logger.error(f"Failed to validate LLM response: {e}")
-                    raise Exception(f"Invalid response format from LLM: {str(e)}")
+                    logger.error(f"Failed to validate GenAI Agent response: {e}")
+                    raise Exception(f"Invalid response format from GenAI Agent: {str(e)}")
                 
         except httpx.TimeoutException:
-            logger.error("LLM request timed out")
+            logger.error("GenAI Agent request timed out")
             raise Exception("Request timed out - please try again")
         
         except httpx.HTTPStatusError as e:
-            logger.error(f"LLM API error: {e.response.status_code} - {e.response.text}")
+            logger.error(f"GenAI Agent API error: {e.response.status_code} - {e.response.text}")
             if e.response.status_code == 401:
                 raise Exception("Authentication failed - check API key")
             elif e.response.status_code == 429:
                 raise Exception("Rate limit exceeded - please try again later")
             else:
-                raise Exception(f"LLM service error: {e.response.status_code}")
+                raise Exception(f"GenAI Agent service error: {e.response.status_code}")
         
         except Exception as e:
-            logger.error(f"Unexpected error in LLM service: {e}")
+            logger.error(f"Unexpected error in GenAI Agent service: {e}")
             raise Exception(f"Failed to get recommendations: {str(e)}")
 
 
 # Global instance
-llm_service = DigitalOceanLLMService()
+llm_service = GenAIAgentService()

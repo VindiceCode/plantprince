@@ -15,6 +15,7 @@ services:
       - sqlite_data:/app/data  # SQLite database volume
     command: uv run uvicorn main:app --host 0.0.0.0 --port 8000 --reload
     restart: unless-stopped
+    working_dir: /backend
     depends_on:
       - db-init
 
@@ -35,13 +36,9 @@ services:
       - "3000:3000"
     depends_on:
       - backend
-    environment:
-      - REACT_APP_API_URL=http://localhost:8000
     volumes:
       - ./frontend:/app
-      - /app/node_modules
-    stdin_open: true
-    tty: true
+    restart: unless-stopped
 
 volumes:
   sqlite_data:

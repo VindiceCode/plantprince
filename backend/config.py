@@ -11,9 +11,9 @@ from pydantic import BaseSettings
 class Settings(BaseSettings):
     """Application settings loaded from environment variables."""
     
-    # Digital Ocean LLM API Configuration
-    digital_ocean_llm_api_key: str
-    digital_ocean_llm_endpoint: str
+    # GenAI Agent API Configuration
+    genai_api_key: str
+    genai_endpoint: str
     
     # Digital Ocean Spaces Configuration (Optional)
     do_spaces_key: Optional[str] = None

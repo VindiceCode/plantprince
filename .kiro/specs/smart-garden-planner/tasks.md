@@ -71,13 +71,13 @@
     - _Requirements: All_
 
 - [ ] 6. Integration testing and demo preparation
-  - [ ] 6.1 Test complete user flow with Docker
+  - [x] 6.1 Test complete user flow with Docker
     - Test location input and LLM recommendation generation
     - Verify plant selection and display functionality
     - Test error handling when LLM service fails
     - _Requirements: 1.1, 1.2, 1.3, 1.4, 2.1, 2.2, 2.3, 2.4, 3.1, 3.2, 3.4, 3.5, 4.1, 4.2, 4.3, 4.4, 5.1, 5.2, 5.3, 5.4_
 
-  - [ ] 6.2 Prepare demo scenarios
+  - [x] 6.2 Prepare demo scenarios
     - Test with various locations (Denver, Austin, Portland, etc.)
     - Verify different preference combinations work with LLM
     - Prepare demo script with reliable test cases
