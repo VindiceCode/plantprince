@@ -13,9 +13,8 @@ services:
       - ./backend:/app
       - /app/__pycache__
       - sqlite_data:/app/data  # SQLite database volume
-    command: uv run uvicorn main:app --host 0.0.0.0 --port 8000 --reload
+    command: cd backend && uv run uvicorn services.requestinfo:app --host 0.0.0.0 --port 8000 --reload
     restart: unless-stopped
-    working_dir: /backend
     depends_on:
       - db-init
 
