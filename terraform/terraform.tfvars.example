@@ -1,0 +1,34 @@
+# DigitalOcean Configuration
+# Get your token from: https://cloud.digitalocean.com/account/api/tokens
+do_token = "your_digitalocean_api_token_here"
+
+# Bucket Configuration
+bucket_name = "garden-planner-storage"  # Must be globally unique
+region      = "nyc3"                    # Choose: nyc3, ams3, sgp1, sfo3, fra1
+
+# Environment
+environment  = "dev"
+project_name = "smart-garden-planner"
+
+# CORS Configuration (for web app access)
+allowed_origins = [
+  "http://localhost:3000",    # React dev server
+  "http://localhost:8000",    # FastAPI server
+  "https://yourdomain.com"    # Your production domain
+]
+
+# CDN Configuration (optional)
+enable_cdn        = false
+cdn_custom_domain = null  # Set to your domain if you want custom CDN domain
+cdn_ttl          = 3600   # Cache TTL in seconds
+
+# Safety Settings
+force_destroy = true  # Set to false for production!
+
+# Tags
+tags = {
+  Project     = "smart-garden-planner"
+  Environment = "dev"
+  ManagedBy   = "terraform"
+  Owner       = "your-name"
+}

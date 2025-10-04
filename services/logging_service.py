@@ -187,3 +187,29 @@ class LoggingService:
                 "recent_requests_count": 0,
                 "spaces_backup_enabled": spaces_client.enabled
             }
+
+
+# Simple function wrapper for backward compatibility
+async def log_request(log_data: Dict[str, Any]) -> None:
+    """
+    Simple function to log request data.
+    This is a simplified version that doesn't require database session.
+    
+    Args:
+        log_data: Dictionary containing request log data
+    """
+    try:
+        # Log to console/file
+        logger.info(f"Request log: {json.dumps(log_data, default=str)}")
+        
+        # Attempt backup to Spaces if available
+        if spaces_client.enabled:
+            try:
+                backup_key = await spaces_client.backup_request_log(log_data)
+                if backup_key:
+                    logger.debug(f"Backed up request log to Spaces: {backup_key}")
+            except Exception as e:
+                logger.warning(f"Spaces backup failed: {e}")
+                
+    except Exception as e:
+        logger.error(f"Failed to log request: {e}")

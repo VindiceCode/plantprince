@@ -1,0 +1,320 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Smart Garden Planner - Frontend Test</title>
+    <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script src="https://unpkg.com/lucide-react@latest/dist/umd/lucide-react.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        /* Additional styles for better testing visibility */
+        .test-indicator {
+            position: fixed;
+            top: 10px;
+            right: 10px;
+            background: #10b981;
+            color: white;
+            padding: 8px 16px;
+            border-radius: 8px;
+            font-weight: bold;
+            z-index: 1000;
+        }
+        .test-indicator.error {
+            background: #ef4444;
+        }
+    </style>
+</head>
+<body>
+    <div id="root"></div>
+    <div id="test-indicator" class="test-indicator">Frontend Test Mode</div>
+    
+    <!-- Load the React component -->
+    <script type="text/babel" src="garden-planner.jsx"></script>
+    
+    <script type="text/babel">
+        // Test utilities
+        const TestUtils = {
+            log: (message, type = 'info') => {
+                const timestamp = new Date().toLocaleTimeString();
+                console.log(`[${timestamp}] [${type.toUpperCase()}] ${message}`);
+                
+                // Update test indicator
+                const indicator = document.getElementById('test-indicator');
+                if (type === 'error') {
+                    indicator.className = 'test-indicator error';
+                    indicator.textContent = 'Test Error - Check Console';
+                } else if (type === 'success') {
+                    indicator.className = 'test-indicator';
+                    indicator.textContent = 'Tests Passing';
+                }
+            },
+            
+            // Mock fetch for testing
+            mockFetch: (url, options) => {
+                TestUtils.log(`Mock API call: ${options?.method || 'GET'} ${url}`);
+                
+                if (url.includes('/api/recommendations') && options?.method === 'POST') {
+                    const requestData = JSON.parse(options.body);
+                    TestUtils.log(`Request data: ${JSON.stringify(requestData)}`);
+                    
+                    // Simulate different responses based on location
+                    if (requestData.location.toLowerCase().includes('error')) {
+                        return Promise.resolve({
+                            ok: false,
+                            status: 500,
+                            json: () => Promise.resolve({
+                                detail: {
+                                    error: "llm_service_failed",
+                                    message: "Test error simulation",
+                                    retry_suggested: true
+                                }
+                            })
+                        });
+                    }
+                    
+                    // Mock successful response
+                    const mockResponse = {
+                        location: requestData.location,
+                        season: "Fall - Test Season",
+                        plants: [
+                            {
+                                name: "Test Native Grass",
+                                scientific: "Testicus grassicus",
+                                sun: "Full Sun",
+                                water: "Low",
+                                maintenance: "Low",
+                                plant_now: true,
+                                care_instructions: "This is a test plant with minimal care requirements. Water occasionally and enjoy.",
+                                notes: "Perfect for testing the frontend display. This plant matches your low-maintenance preferences."
+                            },
+                            {
+                                name: "Mock Wildflower",
+                                scientific: "Mockus flowericus",
+                                sun: "Partial Sun",
+                                water: "Medium",
+                                maintenance: "Low",
+                                plant_now: false,
+                                care_instructions: "Test wildflower that blooms in spring. Requires moderate watering during growing season.",
+                                notes: "Great for adding color to your test garden. Attracts beneficial insects and looks beautiful."
+                            },
+                            {
+                                name: "Demo Shrub",
+                                scientific: "Demonstratus shrubicus",
+                                sun: "Partial Shade",
+                                water: "Low",
+                                maintenance: "Medium",
+                                plant_now: true,
+                                care_instructions: "Hardy test shrub that provides structure to the garden. Prune annually for best shape.",
+                                notes: "Excellent choice for your garden type. Provides year-round interest and requires minimal water."
+                            }
+                        ],
+                        generated_by: "mock"
+                    };
+                    
+                    return Promise.resolve({
+                        ok: true,
+                        status: 200,
+                        json: () => Promise.resolve(mockResponse)
+                    });
+                }
+                
+                // Default mock response
+                return Promise.resolve({
+                    ok: true,
+                    status: 200,
+                    json: () => Promise.resolve({ message: "Mock response" })
+                });
+            }
+        };
+        
+        // Override fetch for testing
+        window.fetch = TestUtils.mockFetch;
+        
+        // Test the component
+        function TestableGardenPlanner() {
+            React.useEffect(() => {
+                TestUtils.log('Garden Planner component mounted', 'success');
+                
+                // Run automated tests after component loads
+                setTimeout(() => {
+                    runAutomatedTests();
+                }, 1000);
+            }, []);
+            
+            return React.createElement(GardenPlanner);
+        }
+        
+        // Automated test functions
+        function runAutomatedTests() {
+            TestUtils.log('Starting automated frontend tests');
+            
+            // Test 1: Check if form elements are present
+            const locationInput = document.querySelector('input[placeholder*="Main St"]');
+            const directionButtons = document.querySelectorAll('button');
+            
+            if (locationInput) {
+                TestUtils.log('✓ Location input found', 'success');
+            } else {
+                TestUtils.log('✗ Location input not found', 'error');
+            }
+            
+            if (directionButtons.length > 0) {
+                TestUtils.log(`✓ Found ${directionButtons.length} interactive buttons`, 'success');
+            } else {
+                TestUtils.log('✗ No buttons found', 'error');
+            }
+            
+            // Test 2: Simulate user interaction
+            setTimeout(() => {
+                simulateUserFlow();
+            }, 2000);
+        }
+        
+        function simulateUserFlow() {
+            TestUtils.log('Simulating user interaction flow');
+            
+            try {
+                // Fill location
+                const locationInput = document.querySelector('input[placeholder*="Main St"]');
+                if (locationInput) {
+                    locationInput.value = 'Test City, CO';
+                    locationInput.dispatchEvent(new Event('input', { bubbles: true }));
+                    TestUtils.log('✓ Location filled', 'success');
+                }
+                
+                // Click direction button
+                const southButton = Array.from(document.querySelectorAll('button')).find(btn => btn.textContent === 'S');
+                if (southButton) {
+                    southButton.click();
+                    TestUtils.log('✓ Direction selected (South)', 'success');
+                }
+                
+                // Click continue button
+                setTimeout(() => {
+                    const continueButton = document.querySelector('button:contains("Continue to Preferences")') || 
+                                         Array.from(document.querySelectorAll('button')).find(btn => 
+                                             btn.textContent.includes('Continue'));
+                    if (continueButton && !continueButton.disabled) {
+                        continueButton.click();
+                        TestUtils.log('✓ Proceeded to preferences step', 'success');
+                        
+                        // Continue with preferences
+                        setTimeout(() => {
+                            simulatePreferences();
+                        }, 1000);
+                    } else {
+                        TestUtils.log('Continue button not available or disabled', 'info');
+                    }
+                }, 1000);
+                
+            } catch (error) {
+                TestUtils.log(`Error in user flow simulation: ${error.message}`, 'error');
+            }
+        }
+        
+        function simulatePreferences() {
+            TestUtils.log('Simulating preferences selection');
+            
+            try {
+                // Select water level
+                const waterButtons = Array.from(document.querySelectorAll('button')).filter(btn => 
+                    ['Low', 'Medium', 'High'].includes(btn.textContent));
+                if (waterButtons.length > 0) {
+                    waterButtons[0].click(); // Select first water option
+                    TestUtils.log('✓ Water level selected', 'success');
+                }
+                
+                // Select maintenance level
+                setTimeout(() => {
+                    const maintenanceButtons = Array.from(document.querySelectorAll('button')).filter(btn => 
+                        ['Low', 'Medium', 'High'].includes(btn.textContent) && 
+                        !btn.classList.contains('bg-blue-600')); // Not already selected for water
+                    if (maintenanceButtons.length > 0) {
+                        maintenanceButtons[0].click();
+                        TestUtils.log('✓ Maintenance level selected', 'success');
+                    }
+                    
+                    // Select garden type
+                    setTimeout(() => {
+                        const gardenTypeButtons = Array.from(document.querySelectorAll('button')).filter(btn => 
+                            ['Native Plants', 'Flower Garden', 'Vegetable Garden', 'Mixed Garden'].includes(btn.textContent));
+                        if (gardenTypeButtons.length > 0) {
+                            gardenTypeButtons[0].click();
+                            TestUtils.log('✓ Garden type selected', 'success');
+                            
+                            // Submit form
+                            setTimeout(() => {
+                                const submitButton = Array.from(document.querySelectorAll('button')).find(btn => 
+                                    btn.textContent.includes('Get My Plant Plan'));
+                                if (submitButton && !submitButton.disabled) {
+                                    submitButton.click();
+                                    TestUtils.log('✓ Form submitted - testing API integration', 'success');
+                                } else {
+                                    TestUtils.log('Submit button not available', 'info');
+                                }
+                            }, 500);
+                        }
+                    }, 500);
+                }, 500);
+                
+            } catch (error) {
+                TestUtils.log(`Error in preferences simulation: ${error.message}`, 'error');
+            }
+        }
+        
+        // Render the component
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(React.createElement(TestableGardenPlanner));
+        
+        // Add manual test controls
+        setTimeout(() => {
+            const testControls = document.createElement('div');
+            testControls.style.cssText = `
+                position: fixed;
+                bottom: 20px;
+                right: 20px;
+                background: white;
+                border: 2px solid #10b981;
+                border-radius: 8px;
+                padding: 16px;
+                box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+                z-index: 1000;
+            `;
+            testControls.innerHTML = `
+                <h3 style="margin: 0 0 10px 0; color: #10b981; font-weight: bold;">Manual Tests</h3>
+                <button onclick="runAutomatedTests()" style="display: block; width: 100%; margin: 5px 0; padding: 8px; background: #10b981; color: white; border: none; border-radius: 4px; cursor: pointer;">Run Tests</button>
+                <button onclick="simulateUserFlow()" style="display: block; width: 100%; margin: 5px 0; padding: 8px; background: #3b82f6; color: white; border: none; border-radius: 4px; cursor: pointer;">Simulate User Flow</button>
+                <button onclick="testErrorHandling()" style="display: block; width: 100%; margin: 5px 0; padding: 8px; background: #ef4444; color: white; border: none; border-radius: 4px; cursor: pointer;">Test Error Handling</button>
+            `;
+            document.body.appendChild(testControls);
+        }, 2000);
+        
+        // Test error handling
+        window.testErrorHandling = function() {
+            TestUtils.log('Testing error handling');
+            
+            // Fill form with error-triggering location
+            const locationInput = document.querySelector('input[placeholder*="Main St"]');
+            if (locationInput) {
+                locationInput.value = 'Error City, CO';
+                locationInput.dispatchEvent(new Event('input', { bubbles: true }));
+                
+                // Trigger form submission to test error handling
+                setTimeout(() => {
+                    const submitButton = Array.from(document.querySelectorAll('button')).find(btn => 
+                        btn.textContent.includes('Get My Plant Plan'));
+                    if (submitButton) {
+                        submitButton.click();
+                        TestUtils.log('✓ Error handling test triggered', 'success');
+                    }
+                }, 1000);
+            }
+        };
+        
+        TestUtils.log('Frontend test environment initialized', 'success');
+    </script>
+</body>
+</html>

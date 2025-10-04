@@ -14,55 +14,55 @@
     - Add validation for required fields and enum values
     - _Requirements: 1.1, 2.1, 2.2, 2.3, 3.2_
 
-  - [-] 2.2 Set up SQLite database and Digital Ocean Object Storage
+  - [x] 2.2 Set up SQLite database and Digital Ocean Object Storage
     - Create simple SQLite schema for logging user requests and responses
     - Implement basic database connection and models using SQLAlchemy
     - Set up Digital Ocean Spaces client for object storage
     - Add optional request/response logging with storage backup
     - _Requirements: 3.1_
 
-- [ ] 3. Implement LLM recommendation service
-  - [ ] 3.1 Create Digital Ocean LLM service interface
+- [x] 3. Implement LLM recommendation service
+  - [x] 3.1 Create Digital Ocean LLM service interface
     - Implement Digital Ocean LLM API client with httpx
     - Create structured prompt template for plant recommendations
     - Add timeout and error handling for LLM requests
     - _Requirements: 3.1, 3.2, 3.5_
 
-  - [ ] 3.2 Create recommendations API endpoint
+  - [x] 3.2 Create recommendations API endpoint
     - Implement POST /api/recommendations route
     - Process user input and create LLM prompt with location and preferences
     - Parse LLM JSON response and validate against Plant model
     - Add error handling for malformed LLM responses
     - _Requirements: 1.1, 1.2, 2.1, 2.2, 2.3, 3.1, 3.2, 3.4, 4.1, 4.2, 4.3, 4.4_
 
-- [ ] 4. Update React frontend integration
-  - [ ] 4.1 Replace mock API calls with real endpoint
+- [x] 4. Update React frontend integration
+  - [x] 4.1 Replace mock API calls with real endpoint
     - Update form submission to call /api/recommendations directly
     - Remove mock data and use actual LLM-generated responses
     - Handle text-based location input (no geocoding needed)
     - _Requirements: 1.1, 1.3, 3.1_
 
-  - [ ] 4.2 Add proper error handling and loading states
+  - [x] 4.2 Add proper error handling and loading states
     - Handle LLM API errors with user-friendly messages
     - Show loading spinners during LLM processing
     - Implement retry logic for failed LLM requests
     - _Requirements: 3.5_
 
-  - [ ] 4.3 Update plant selection and display logic
+  - [x] 4.3 Update plant selection and display logic
     - Ensure plant checkboxes work with LLM response data structure
     - Update plant card display to match LLM response format
     - Implement selection count tracking and summary display
     - _Requirements: 4.1, 4.2, 4.3, 4.4, 5.1, 5.2, 5.3, 5.4_
 
-- [ ] 5. Environment setup and configuration
-  - [ ] 5.1 Create environment configuration
+- [x] 5. Environment setup and configuration
+  - [x] 5.1 Create environment configuration
     - Set up .env file with Digital Ocean LLM API key and endpoint
     - Add Digital Ocean Spaces credentials and configuration
     - Create config.py for environment variable management
     - Add Docker environment variables configuration
     - _Requirements: 1.1, 3.1_
 
-  - [ ] 5.2 Create Docker setup and documentation
+  - [x] 5.2 Create Docker setup and documentation
     - Write Dockerfile with Python FastAPI setup
     - Create docker-compose.yml with SQLite volume mounting and DO Spaces integration
     - Configure Digital Ocean Object Storage service in composition
@@ -70,7 +70,7 @@
     - Add example .env file with DO LLM and Spaces placeholder values
     - _Requirements: All_
 
-- [ ] 6. Integration testing and demo preparation
+- [-] 6. Integration testing and demo preparation
   - [ ] 6.1 Test complete user flow with Docker
     - Test location input and LLM recommendation generation
     - Verify plant selection and display functionality

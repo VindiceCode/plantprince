@@ -1,14 +1,14 @@
 import React, { useState } from 'react';
-import { Leaf, MapPin, Droplets, Sun, Calendar, Sprout } from 'lucide-react';
+import { Leaf, MapPin, Droplets, Sun, Calendar, Sprout, Loader2 } from 'lucide-react';
 
 export default function GardenPlanner() {
   const [step, setStep] = useState(1);
   const [formData, setFormData] = useState({
-    address: '',
+    location: '',
     direction: '',
     maintenance: '',
     water: '',
-    gardenType: '',
+    garden_type: '',
     photo: null
   });
   const [recommendations, setRecommendations] = useState(null);
@@ -17,76 +17,92 @@ export default function GardenPlanner() {
   const [loading, setLoading] = useState(false);
   const [generatingImage, setGeneratingImage] = useState(false);
 
-  // Mock plant data
-  const mockRecommendations = {
-    zone: "6b",
-    season: "Fall Planting Season",
-    plants: [
-      {
-        name: "Black-Eyed Susan",
-        scientific: "Rudbeckia hirta",
-        sun: "Full Sun",
-        water: "Low",
-        maintenance: "Low",
-        plantNow: true,
-        spacing: "12-18 inches",
-        companions: ["Purple Coneflower", "Switchgrass"],
-        notes: "Native perennial. Plant now for spring blooms. Attracts pollinators."
-      },
-      {
-        name: "Autumn Joy Sedum",
-        scientific: "Sedum spectabile",
-        sun: "Full Sun",
-        water: "Low",
-        maintenance: "Low",
-        plantNow: true,
-        spacing: "18-24 inches",
-        companions: ["Russian Sage", "Black-Eyed Susan"],
-        notes: "Drought-tolerant succulent. Provides fall color and winter interest."
-      },
-      {
-        name: "Russian Sage",
-        scientific: "Perovskia atriplicifolia",
-        sun: "Full Sun",
-        water: "Low",
-        maintenance: "Low",
-        plantNow: true,
-        spacing: "24-36 inches",
-        companions: ["Sedum", "Ornamental Grasses"],
-        notes: "Aromatic foliage. Long blooming period. Deer resistant."
-      },
-      {
-        name: "Purple Coneflower",
-        scientific: "Echinacea purpurea",
-        sun: "Full Sun to Partial Shade",
-        water: "Medium",
-        maintenance: "Low",
-        plantNow: true,
-        spacing: "18-24 inches",
-        companions: ["Black-Eyed Susan", "Switchgrass"],
-        notes: "Native perennial. Medicinal properties. Birds love the seed heads."
+  const [error, setError] = useState(null);
+  const [retryCount, setRetryCount] = useState(0);
+
+  const handleSubmit = async (e, isRetry = false) => {
+    e?.preventDefault();
+    setLoading(true);
+    setError(null);
+    
+    if (!isRetry) {
+      setRetryCount(0);
+    }
+    
+    try {
+      const requestData = {
+        location: formData.location,
+        direction: formData.direction,
+        water: formData.water,
+        maintenance: formData.maintenance,
+        garden_type: formData.garden_type
+      };
+
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 second timeout
+
+      const response = await fetch('/api/recommendations', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(requestData),
+        signal: controller.signal
+      });
+
+      clearTimeout(timeoutId);
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        const errorDetail = errorData.detail || {};
+        
+        // Create a more user-friendly error message
+        let userMessage = 'Unable to generate plant recommendations. ';
+        
+        if (response.status === 503) {
+          userMessage += 'The recommendation service is currently unavailable.';
+        } else if (response.status === 429) {
+          userMessage += 'Too many requests. Please wait a moment and try again.';
+        } else if (response.status === 504) {
+          userMessage += 'The request timed out. Please try again.';
+        } else {
+          userMessage += errorDetail.message || 'Please try again.';
+        }
+        
+        const error = new Error(userMessage);
+        error.retryable = errorDetail.retry_suggested !== false;
+        error.statusCode = response.status;
+        throw error;
       }
-    ],
-    timeline: [
-      { month: "October", tasks: ["Plant perennials", "Add mulch", "Water deeply once"] },
-      { month: "November", tasks: ["Stop watering", "Leave seed heads for birds"] },
-      { month: "Spring", tasks: ["Cut back dead foliage", "Apply compost", "Watch for new growth"] }
-    ]
+
+      const data = await response.json();
+      setRecommendations(data);
+      
+      // Initialize all plants as selected
+      const allPlantNames = data.plants.map(p => p.name);
+      setSelectedPlants(new Set(allPlantNames));
+      setRetryCount(0); // Reset retry count on success
+      setStep(3);
+    } catch (err) {
+      console.error('Error getting recommendations:', err);
+      
+      if (err.name === 'AbortError') {
+        setError('Request timed out. Please check your connection and try again.');
+      } else {
+        setError(err.message);
+      }
+      
+      // Set retry count for display
+      if (isRetry) {
+        setRetryCount(prev => prev + 1);
+      }
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    setLoading(true);
-    
-    // Simulate API call to DO Agent
-    setTimeout(() => {
-      setRecommendations(mockRecommendations);
-      // Initialize all plants as selected
-      const allPlantNames = mockRecommendations.plants.map(p => p.name);
-      setSelectedPlants(new Set(allPlantNames));
-      setLoading(false);
-      setStep(3);
-    }, 2000);
+  const handleRetry = () => {
+    handleSubmit(null, true);
   };
 
   const togglePlant = (plantName) => {
@@ -158,8 +174,8 @@ export default function GardenPlanner() {
                   type="text"
                   placeholder="123 Main St, Denver, CO 80202"
                   className="w-full px-4 py-3 bg-gray-700 border-2 border-gray-600 rounded-lg focus:border-green-500 focus:outline-none text-white placeholder-gray-400"
-                  value={formData.address}
-                  onChange={(e) => handleInputChange('address', e.target.value)}
+                  value={formData.location}
+                  onChange={(e) => handleInputChange('location', e.target.value)}
                 />
                 <p className="text-sm text-gray-400 mt-1">We'll auto-detect your USDA Hardiness Zone</p>
               </div>
@@ -201,7 +217,7 @@ export default function GardenPlanner() {
 
               <button
                 onClick={() => setStep(2)}
-                disabled={!formData.address || !formData.direction}
+                disabled={!formData.location || !formData.direction}
                 className="w-full bg-green-600 text-white py-3 rounded-lg font-semibold hover:bg-green-700 transition-colors disabled:bg-gray-700 disabled:text-gray-500 disabled:cursor-not-allowed"
               >
                 Continue to Preferences
@@ -212,10 +228,39 @@ export default function GardenPlanner() {
 
         {/* Step 2: Preferences */}
         {step === 2 && (
-          <div className="bg-gray-800 rounded-lg shadow-2xl p-8 border border-gray-700">
+          <div className="bg-gray-800 rounded-lg shadow-2xl p-8 border border-gray-700 relative">
             <h2 className="text-2xl font-bold text-green-400 mb-6">
               What are your gardening preferences?
             </h2>
+            
+            {error && (
+              <div className="bg-red-900/50 border border-red-700 rounded-lg p-4 mb-6">
+                <div className="flex items-start justify-between">
+                  <div className="flex-1">
+                    <p className="text-red-300 font-semibold mb-2">Unable to get recommendations</p>
+                    <p className="text-red-200 mb-3">{error}</p>
+                    {retryCount > 0 && (
+                      <p className="text-red-400 text-sm">Retry attempt: {retryCount}</p>
+                    )}
+                  </div>
+                </div>
+                <div className="flex gap-2 mt-3">
+                  <button
+                    onClick={handleRetry}
+                    disabled={loading}
+                    className="bg-red-700 hover:bg-red-600 disabled:bg-red-800 disabled:cursor-not-allowed text-white px-4 py-2 rounded-lg font-semibold transition-colors"
+                  >
+                    {loading ? 'Retrying...' : 'Try Again'}
+                  </button>
+                  <button
+                    onClick={() => setError(null)}
+                    className="bg-gray-700 hover:bg-gray-600 text-gray-200 px-4 py-2 rounded-lg font-semibold transition-colors"
+                  >
+                    Dismiss
+                  </button>
+                </div>
+              </div>
+            )}
             
             <form onSubmit={handleSubmit} className="space-y-6">
               <div>
@@ -270,13 +315,13 @@ export default function GardenPlanner() {
                   Garden Type
                 </label>
                 <div className="grid grid-cols-2 gap-2">
-                  {['Native Plants', 'Flower Garden', 'Vegetable Garden', 'Mixed'].map((type) => (
+                  {['Native Plants', 'Flower Garden', 'Vegetable Garden', 'Mixed Garden'].map((type) => (
                     <button
                       key={type}
                       type="button"
-                      onClick={() => handleInputChange('gardenType', type)}
+                      onClick={() => handleInputChange('garden_type', type)}
                       className={`py-3 px-4 rounded-lg font-semibold transition-colors ${
-                        formData.gardenType === type
+                        formData.garden_type === type
                           ? 'bg-green-600 text-white'
                           : 'bg-gray-700 text-gray-200 hover:bg-gray-600 border border-gray-600'
                       }`}
@@ -297,25 +342,37 @@ export default function GardenPlanner() {
                 </button>
                 <button
                   type="submit"
-                  disabled={!formData.water || !formData.maintenance || !formData.gardenType}
-                  className="flex-1 bg-green-600 text-white py-3 rounded-lg font-semibold hover:bg-green-700 transition-colors disabled:bg-gray-700 disabled:text-gray-500 disabled:cursor-not-allowed"
+                  disabled={!formData.water || !formData.maintenance || !formData.garden_type || loading}
+                  className="flex-1 bg-green-600 text-white py-3 rounded-lg font-semibold hover:bg-green-700 transition-colors disabled:bg-gray-700 disabled:text-gray-500 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                 >
+                  {loading && <Loader2 className="w-5 h-5 animate-spin" />}
                   {loading ? 'Generating Plan...' : 'Get My Plant Plan'}
                 </button>
               </div>
             </form>
+            
+            {/* Loading overlay */}
+            {loading && (
+              <div className="absolute inset-0 bg-gray-900/75 rounded-lg flex items-center justify-center">
+                <div className="bg-gray-800 p-6 rounded-lg border border-gray-700 text-center">
+                  <Loader2 className="w-8 h-8 animate-spin text-green-400 mx-auto mb-3" />
+                  <p className="text-green-300 font-semibold">Generating your personalized plant recommendations...</p>
+                  <p className="text-gray-400 text-sm mt-1">This may take up to 30 seconds</p>
+                </div>
+              </div>
+            )}
           </div>
         )}
 
         {/* Step 3: Results */}
         {step === 3 && recommendations && (
           <div className="space-y-6">
-            {/* Zone Info */}
+            {/* Location and Season Info */}
             <div className="bg-gray-800 rounded-lg shadow-2xl p-6 border border-gray-700">
               <div className="flex items-center justify-between">
                 <div>
-                  <h3 className="text-lg font-semibold text-gray-300">Your Growing Zone</h3>
-                  <p className="text-3xl font-bold text-green-400">{recommendations.zone}</p>
+                  <h3 className="text-lg font-semibold text-gray-300">Location</h3>
+                  <p className="text-2xl font-bold text-green-400">{recommendations.location}</p>
                 </div>
                 <div className="text-right">
                   <h3 className="text-lg font-semibold text-gray-300">Current Season</h3>
@@ -324,6 +381,51 @@ export default function GardenPlanner() {
               </div>
             </div>
 
+            {/* Selection Summary */}
+            {selectedPlants.size > 0 && (
+              <div className="bg-green-900/30 border border-green-700 rounded-lg p-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h3 className="text-lg font-semibold text-green-300">Your Garden Selection</h3>
+                    <p className="text-green-200">
+                      {selectedPlants.size} plant{selectedPlants.size !== 1 ? 's' : ''} selected for your {formData.garden_type.toLowerCase()} in {formData.location}
+                    </p>
+                    {(() => {
+                      const selectedPlantObjects = recommendations.plants.filter(p => selectedPlants.has(p.name));
+                      const plantNowCount = selectedPlantObjects.filter(p => p.plant_now).length;
+                      return plantNowCount > 0 && (
+                        <p className="text-orange-300 text-sm mt-1">
+                          {plantNowCount} can be planted now
+                        </p>
+                      );
+                    })()}
+                  </div>
+                  <div className="text-right">
+                    <p className="text-2xl font-bold text-green-400">{selectedPlants.size}</p>
+                    <p className="text-sm text-green-300">Plants</p>
+                  </div>
+                </div>
+                <div className="mt-3 flex flex-wrap gap-2">
+                  {Array.from(selectedPlants).map(plantName => {
+                    const plant = recommendations.plants.find(p => p.name === plantName);
+                    return (
+                      <span 
+                        key={plantName} 
+                        className={`px-3 py-1 rounded-full text-sm border ${
+                          plant?.plant_now 
+                            ? 'bg-orange-800/50 text-orange-200 border-orange-600' 
+                            : 'bg-green-800/50 text-green-200 border-green-600'
+                        }`}
+                      >
+                        {plantName}
+                        {plant?.plant_now && ' ⭐'}
+                      </span>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
             {/* Plant Recommendations */}
             <div className="bg-gray-800 rounded-lg shadow-2xl p-6 border border-gray-700">
               <div className="flex items-center justify-between mb-4">
@@ -331,27 +433,55 @@ export default function GardenPlanner() {
                   <Leaf className="w-6 h-6" />
                   Recommended Plants for Your Yard
                 </h2>
-                <span className="text-sm text-gray-400">
-                  {selectedPlants.size} of {recommendations.plants.length} selected
-                </span>
+                <div className="flex items-center gap-4">
+                  <div className="text-right">
+                    <span className="text-lg font-semibold text-green-300">
+                      {selectedPlants.size} of {recommendations.plants.length}
+                    </span>
+                    <p className="text-sm text-gray-400">selected</p>
+                  </div>
+                  <button
+                    onClick={() => {
+                      if (selectedPlants.size === recommendations.plants.length) {
+                        setSelectedPlants(new Set());
+                      } else {
+                        setSelectedPlants(new Set(recommendations.plants.map(p => p.name)));
+                      }
+                    }}
+                    className="bg-green-700 hover:bg-green-600 text-white px-3 py-1 rounded-lg text-sm font-semibold transition-colors"
+                  >
+                    {selectedPlants.size === recommendations.plants.length ? 'Deselect All' : 'Select All'}
+                  </button>
+                </div>
               </div>
+              
+              {selectedPlants.size === 0 && (
+                <div className="bg-yellow-900/30 border border-yellow-700 rounded-lg p-4 mb-4">
+                  <p className="text-yellow-300 font-semibold">No plants selected</p>
+                  <p className="text-yellow-200 text-sm">Click on plant cards or checkboxes to select plants for your garden.</p>
+                </div>
+              )}
               
               <div className="grid gap-4">
                 {recommendations.plants.map((plant, idx) => (
                   <div 
                     key={idx} 
-                    className={`border-2 rounded-lg p-4 transition-all ${
+                    className={`border-2 rounded-lg p-4 transition-all cursor-pointer hover:border-green-400 ${
                       selectedPlants.has(plant.name)
-                        ? 'border-green-500 bg-gray-700/50'
-                        : 'border-gray-600 bg-gray-700/20 opacity-60'
+                        ? 'border-green-500 bg-gray-700/50 shadow-lg shadow-green-500/20'
+                        : 'border-gray-600 bg-gray-700/20 opacity-70 hover:opacity-90'
                     }`}
+                    onClick={() => togglePlant(plant.name)}
                   >
                     <div className="flex items-start justify-between mb-2">
                       <div className="flex items-start gap-3 flex-1">
                         <input
                           type="checkbox"
                           checked={selectedPlants.has(plant.name)}
-                          onChange={() => togglePlant(plant.name)}
+                          onChange={(e) => {
+                            e.stopPropagation();
+                            togglePlant(plant.name);
+                          }}
                           className="mt-1 w-5 h-5 rounded border-gray-600 bg-gray-700 checked:bg-green-600 cursor-pointer"
                         />
                         <div className="flex-1">
@@ -359,7 +489,7 @@ export default function GardenPlanner() {
                           <p className="text-sm text-gray-400 italic">{plant.scientific}</p>
                         </div>
                       </div>
-                      {plant.plantNow && (
+                      {plant.plant_now && (
                         <span className="bg-green-900/50 text-green-300 px-3 py-1 rounded-full text-sm font-semibold border border-green-700">
                           Plant Now
                         </span>
@@ -380,16 +510,16 @@ export default function GardenPlanner() {
                         <p className="font-semibold text-sm text-purple-300">{plant.maintenance}</p>
                       </div>
                       <div className="bg-green-900/30 p-2 rounded text-center border border-green-700/30">
-                        <p className="text-xs text-gray-400">Spacing</p>
-                        <p className="font-semibold text-sm text-green-300">{plant.spacing}</p>
+                        <p className="text-xs text-gray-400">Care</p>
+                        <p className="font-semibold text-sm text-green-300">Instructions</p>
                       </div>
                     </div>
 
                     <p className="text-gray-300 mb-2 ml-8">{plant.notes}</p>
                     
                     <div className="bg-emerald-900/30 p-3 rounded mt-2 ml-8 border border-emerald-700/30">
-                      <p className="text-sm font-semibold text-emerald-300 mb-1">Companion Plants:</p>
-                      <p className="text-sm text-emerald-400">{plant.companions.join(', ')}</p>
+                      <p className="text-sm font-semibold text-emerald-300 mb-1">Care Instructions:</p>
+                      <p className="text-sm text-emerald-400">{plant.care_instructions}</p>
                     </div>
                   </div>
                 ))}
@@ -458,26 +588,7 @@ export default function GardenPlanner() {
               )}
             </div>
 
-            {/* Timeline */}
-            <div className="bg-gray-800 rounded-lg shadow-2xl p-6 border border-gray-700">
-              <h2 className="text-2xl font-bold text-green-400 mb-4 flex items-center gap-2">
-                <Calendar className="w-6 h-6" />
-                Your Care Timeline
-              </h2>
-              
-              <div className="space-y-4">
-                {recommendations.timeline.map((item, idx) => (
-                  <div key={idx} className="border-l-4 border-green-500 pl-4">
-                    <h3 className="font-bold text-lg text-gray-200">{item.month}</h3>
-                    <ul className="list-disc list-inside text-gray-300">
-                      {item.tasks.map((task, tidx) => (
-                        <li key={tidx}>{task}</li>
-                      ))}
-                    </ul>
-                  </div>
-                ))}
-              </div>
-            </div>
+
 
             {/* Action Buttons */}
             <div className="flex gap-4">
@@ -487,6 +598,16 @@ export default function GardenPlanner() {
                   setRecommendations(null);
                   setSelectedPlants(new Set());
                   setGeneratedImage(null);
+                  setError(null);
+                  setRetryCount(0);
+                  setFormData({
+                    location: '',
+                    direction: '',
+                    maintenance: '',
+                    water: '',
+                    garden_type: '',
+                    photo: null
+                  });
                 }}
                 className="flex-1 bg-gray-700 text-gray-200 py-3 rounded-lg font-semibold hover:bg-gray-600 transition-colors border border-gray-600"
               >
